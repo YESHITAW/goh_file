@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.FileInputStream
 
 class GreetingPlayer(private val context: Context) {
 
@@ -49,7 +50,9 @@ class GreetingPlayer(private val context: Context) {
         try {
             player.setAudioAttributes(attributes)
             if (useCustom && customFile != null && customFile.exists() && customFile.length() > 0L) {
-                player.setDataSource(customFile.absolutePath)
+                FileInputStream(customFile).use { fis ->
+                    player.setDataSource(fis.fd)
+                }
             } else {
                 val afd = context.resources.openRawResourceFd(R.raw.greeting)
                 afd.use {

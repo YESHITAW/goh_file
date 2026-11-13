@@ -12,6 +12,8 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.util.UUID
 
 class VoicemailRepository private constructor(private val appContext: Context) {
@@ -25,30 +27,79 @@ class VoicemailRepository private constructor(private val appContext: Context) {
     private val _voicemails = MutableStateFlow<List<VoicemailItem>>(emptyList())
     val voicemails: StateFlow<List<VoicemailItem>> = _voicemails.asStateFlow()
 
-    private val _hasCustomGreeting = MutableStateFlow(getCustomGreetingFile().exists())
+    private val _hasCustomGreeting = MutableStateFlow(hasValidCustomGreeting())
     val hasCustomGreeting: StateFlow<Boolean> = _hasCustomGreeting.asStateFlow()
 
     init {
         refreshSync()
     }
 
-    fun getCustomGreetingFile(): File = File(greetingsDir, "custom_greeting.m4a")
+    fun getCustomGreetingFile(): File {
+        val mp3File = File(greetingsDir, "custom_greeting.mp3")
+        if (mp3File.exists() && mp3File.length() > 0L) return mp3File
+        val legacyM4a = File(greetingsDir, "custom_greeting.m4a")
+        return if (legacyM4a.exists() && legacyM4a.length() > 0L) legacyM4a else mp3File
+    }
+
+    fun getCustomGreetingWriteTarget(): File = File(greetingsDir, "custom_greeting.mp3")
+
+    private fun hasValidCustomGreeting(): Boolean {
+        val file = getCustomGreetingFile()
+        return file.exists() && file.length() > 0L
+    }
 
     fun refreshCustomGreetingStatus() {
-        val file = getCustomGreetingFile()
-        _hasCustomGreeting.value = file.exists() && file.length() > 0L
+        _hasCustomGreeting.value = hasValidCustomGreeting()
     }
 
     fun deleteCustomGreeting(): Boolean {
-        val file = getCustomGreetingFile()
-        val deleted = if (file.exists()) file.delete() else true
+        val mp3Deleted = File(greetingsDir, "custom_greeting.mp3").let { !it.exists() || it.delete() }
+        val legacyDeleted = File(greetingsDir, "custom_greeting.m4a").let { !it.exists() || it.delete() }
         refreshCustomGreetingStatus()
-        return deleted
+        return mp3Deleted && legacyDeleted
+    }
+
+    suspend fun importCustomGreetingFromUri(sourceUri: Uri): Boolean = withContext(Dispatchers.IO) {
+        greetingsDir.mkdirs()
+        val targetFile = getCustomGreetingWriteTarget()
+        val tempFile = File(greetingsDir, "import_temp.mp3")
+        try {
+            appContext.contentResolver.openInputStream(sourceUri)?.use { input ->
+                FileOutputStream(tempFile).use { output ->
+                    input.copyTo(output)
+                }
+            } ?: return@withContext false
+
+            if (!tempFile.exists() || tempFile.length() <= 0L) {
+                tempFile.delete()
+                return@withContext false
+            }
+
+            // Validate playable audio before replacing active custom greeting
+            val duration = readAudioDuration(tempFile)
+            if (duration <= 0L) {
+                tempFile.delete()
+                return@withContext false
+            }
+
+            File(greetingsDir, "custom_greeting.m4a").delete()
+            if (targetFile.exists()) targetFile.delete()
+            val moved = tempFile.renameTo(targetFile)
+            if (!moved) {
+                tempFile.copyTo(targetFile, overwrite = true)
+                tempFile.delete()
+            }
+            refreshCustomGreetingStatus()
+            true
+        } catch (_: Exception) {
+            tempFile.delete()
+            false
+        }
     }
 
     fun createRecordingTargetFile(timestampMillis: Long = System.currentTimeMillis()): File {
         voicemailsDir.mkdirs()
-        return File(voicemailsDir, "vm_${timestampMillis}_${UUID.randomUUID().toString().take(6)}.m4a")
+        return File(voicemailsDir, "vm_${timestampMillis}_${UUID.randomUUID().toString().take(6)}.mp3")
     }
 
     suspend fun registerCompletedRecording(
@@ -90,10 +141,12 @@ class VoicemailRepository private constructor(private val appContext: Context) {
             val indexed = readIndexInternal().filter { File(it.filePath).exists() }.toMutableList()
             val knownPaths = indexed.map { it.filePath }.toSet()
 
-            // Pick up any unindexed .m4a or .3gp files in voicemailsDir
             val audioFiles = voicemailsDir.listFiles { f ->
-                f.isFile && (f.extension.equals("m4a", ignoreCase = true) ||
-                    f.extension.equals("3gp", ignoreCase = true))
+                f.isFile && (
+                    f.extension.equals("mp3", ignoreCase = true) ||
+                        f.extension.equals("m4a", ignoreCase = true) ||
+                        f.extension.equals("3gp", ignoreCase = true)
+                    )
             }?.sortedByDescending { it.lastModified() }.orEmpty()
 
             var changed = false
@@ -159,7 +212,9 @@ class VoicemailRepository private constructor(private val appContext: Context) {
     private fun readAudioDuration(file: File): Long {
         val retriever = MediaMetadataRetriever()
         return try {
-            retriever.setDataSource(file.absolutePath)
+            FileInputStream(file).use { fis ->
+                retriever.setDataSource(fis.fd)
+            }
             retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
         } catch (_: Exception) {
             0L

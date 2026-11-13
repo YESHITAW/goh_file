@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaRecorder
+import android.net.Uri
 import android.os.Build
 import android.telecom.TelecomManager
 import androidx.core.content.ContextCompat
@@ -173,11 +174,17 @@ class AnsweringViewModel(application: Application) : AndroidViewModel(applicatio
         if (_previewState.value.isPlaying) {
             stopGreetingPreview()
         }
-        playbackController.togglePlayback(item) {
-            viewModelScope.launch {
-                voicemailRepository.markAsHeard(item.id)
+        playbackController.togglePlayback(
+            item = item,
+            onStarted = {
+                viewModelScope.launch {
+                    voicemailRepository.markAsHeard(item.id)
+                }
+            },
+            onError = { message ->
+                _bannerMessage.value = message
             }
-        }
+        )
     }
 
     fun seekVoicemail(fraction: Float) {
@@ -193,8 +200,13 @@ class AnsweringViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun buildShareIntent(item: VoicemailItem): Intent? {
         val uri = voicemailRepository.getShareableUri(item) ?: return null
+        val mime = if (item.filePath.endsWith(".mp3", ignoreCase = true)) {
+            "audio/mpeg"
+        } else {
+            "audio/mp4"
+        }
         return Intent(Intent.ACTION_SEND).apply {
-            type = "audio/mp4"
+            type = mime
             putExtra(Intent.EXTRA_STREAM, uri)
             putExtra(Intent.EXTRA_SUBJECT, "Voicemail from ${item.callerNumber}")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -244,6 +256,7 @@ class AnsweringViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun startRecordingCustomGreeting() {
+        _readiness.value = computeReadiness(appContext)
         if (!_readiness.value.hasRecordAudio) {
             _bannerMessage.value = "Microphone permission is required to record a greeting."
             return
@@ -251,26 +264,45 @@ class AnsweringViewModel(application: Application) : AndroidViewModel(applicatio
         stopGreetingPreview()
         playbackController.stop()
 
-        val target = voicemailRepository.getCustomGreetingFile()
+        val target = voicemailRepository.getCustomGreetingWriteTarget()
         val started = greetingRecorder.startRecording(
             outputFile = target,
             audioSource = MediaRecorder.AudioSource.MIC
         )
         if (!started) {
-            _bannerMessage.value = "Unable to start microphone recording."
+            _bannerMessage.value = greetingRecorder.lastError.value
+                ?: "Unable to start microphone MP3 recording."
         }
     }
 
     fun stopRecordingCustomGreeting() {
         val duration = greetingRecorder.stopRecording()
+        val recorderError = greetingRecorder.lastError.value
         voicemailRepository.refreshCustomGreetingStatus()
         viewModelScope.launch {
-            if (duration >= 400L && voicemailRepository.hasCustomGreeting.value) {
+            if (recorderError != null) {
+                voicemailRepository.deleteCustomGreeting()
+                _bannerMessage.value = recorderError
+            } else if (duration >= 400L && voicemailRepository.hasCustomGreeting.value) {
                 settingsRepository.setUseCustomGreeting(true)
-                _bannerMessage.value = "Custom greeting saved and selected."
+                _bannerMessage.value = "Custom MP3 greeting saved and selected."
             } else {
                 voicemailRepository.deleteCustomGreeting()
                 _bannerMessage.value = "Recording was too short. Hold or tap longer to record."
+            }
+        }
+    }
+
+    fun importCustomGreeting(uri: Uri) {
+        stopGreetingPreview()
+        playbackController.stop()
+        viewModelScope.launch {
+            val imported = voicemailRepository.importCustomGreetingFromUri(uri)
+            if (imported) {
+                settingsRepository.setUseCustomGreeting(true)
+                _bannerMessage.value = "Custom MP3 greeting imported and selected."
+            } else {
+                _bannerMessage.value = "Could not import that audio file. Please pick a valid MP3."
             }
         }
     }

@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -65,6 +66,7 @@ fun GreetingStudioScreen(
     onPlayTestBeep: () -> Unit,
     onStartRecording: () -> Unit,
     onStopRecording: () -> Unit,
+    onImportMp3Greeting: () -> Unit,
     onDeleteCustomGreeting: () -> Unit,
     onSelectRingDelay: (Int) -> Unit,
     onSelectMaxDuration: (Int) -> Unit,
@@ -273,17 +275,24 @@ fun GreetingStudioScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Custom Voice Studio",
-                                style = MaterialTheme.typography.titleLarge
-                            )
+                            Column {
+                                Text(
+                                    text = "Custom Voice Studio",
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                                Text(
+                                    text = "Records & saves in MP3 format (96 kbps)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                             Text(
                                 text = if (studio.isRecording) {
-                                    "REC ${formatMillis(studio.elapsedMillis)}"
+                                    "REC MP3 ${formatMillis(studio.elapsedMillis)}"
                                 } else if (uiState.hasCustomGreeting) {
-                                    "SAVED"
+                                    "MP3 SAVED"
                                 } else {
-                                    "READY"
+                                    "MP3 READY"
                                 },
                                 style = MaterialTheme.typography.labelMedium,
                                 fontFamily = MonoFontFamily,
@@ -338,6 +347,20 @@ fun GreetingStudioScreen(
                                         else -> "Record Custom Greeting"
                                     }
                                 )
+                            }
+
+                            if (!studio.isRecording) {
+                                OutlinedButton(
+                                    onClick = onImportMp3Greeting,
+                                    modifier = Modifier.testTag("import_mp3_greeting_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.UploadFile,
+                                        contentDescription = "Import MP3 greeting"
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Import .mp3")
+                                }
                             }
 
                             if (uiState.hasCustomGreeting && !studio.isRecording) {

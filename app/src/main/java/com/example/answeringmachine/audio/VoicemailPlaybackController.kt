@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.FileInputStream
 
 data class PlaybackState(
     val activeVoicemailId: String? = null,
@@ -36,7 +37,11 @@ class VoicemailPlaybackController {
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
 
-    fun togglePlayback(item: VoicemailItem, onStarted: () -> Unit = {}) {
+    fun togglePlayback(
+        item: VoicemailItem,
+        onStarted: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
         val current = _state.value
         if (current.activeVoicemailId == item.id && mediaPlayer != null) {
             val player = mediaPlayer ?: return
@@ -57,7 +62,10 @@ class VoicemailPlaybackController {
 
         stop()
         val file = File(item.filePath)
-        if (!file.exists()) return
+        if (!file.exists() || file.length() <= 0L) {
+            onError("Recorded audio file is missing or empty.")
+            return
+        }
 
         val player = MediaPlayer()
         mediaPlayer = player
@@ -68,7 +76,9 @@ class VoicemailPlaybackController {
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build()
             )
-            player.setDataSource(file.absolutePath)
+            FileInputStream(file).use { fis ->
+                player.setDataSource(fis.fd)
+            }
             player.setOnPreparedListener { mp ->
                 val dur = mp.duration.toLong().coerceAtLeast(item.durationMillis)
                 mp.start()
@@ -92,13 +102,15 @@ class VoicemailPlaybackController {
                 )
                 releasePlayer()
             }
-            player.setOnErrorListener { _, _, _ ->
+            player.setOnErrorListener { _, what, extra ->
                 stop()
+                onError("Unable to play recording ($what/$extra).")
                 true
             }
             player.prepareAsync()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             stop()
+            onError(e.message ?: "Unable to open audio recording.")
         }
     }
 

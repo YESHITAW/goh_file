@@ -815,7 +815,7 @@ private fun EmptyVoicemailsCard(isEnabled: Boolean) {
             )
             Text(
                 text = if (isEnabled) {
-                    "CallDeck is armed. Incoming phone calls will be auto-answered, greeted, and saved here as .m4a recordings."
+                    "CallDeck is armed. Incoming phone calls will be auto-answered, greeted, and saved here as .mp3 recordings."
                 } else {
                     "Switch the answering machine ON above to automatically answer calls and capture caller messages."
                 },

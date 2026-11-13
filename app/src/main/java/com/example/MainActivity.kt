@@ -114,6 +114,14 @@ fun CallDeckRoot(
         viewModel.refreshSystemStatus()
     }
 
+    val importMp3Launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.importCustomGreeting(uri)
+        }
+    }
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -257,6 +265,9 @@ fun CallDeckRoot(
                         onPlayTestBeep = viewModel::playTestBeep,
                         onStartRecording = viewModel::startRecordingCustomGreeting,
                         onStopRecording = viewModel::stopRecordingCustomGreeting,
+                        onImportMp3Greeting = {
+                            importMp3Launcher.launch(arrayOf("audio/mpeg", "audio/mp3", "audio/*"))
+                        },
                         onDeleteCustomGreeting = viewModel::deleteCustomGreeting,
                         onSelectRingDelay = viewModel::setRingDelaySeconds,
                         onSelectMaxDuration = viewModel::setMaxRecordingSeconds,

@@ -18,12 +18,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PhoneCallback
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.PhoneCallback
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
@@ -148,7 +148,7 @@ fun SetupScreen(
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                         StatusRow(
-                            icon = Icons.Filled.PhoneCallback,
+                            icon = Icons.AutoMirrored.Filled.PhoneCallback,
                             title = "Answer Calls (ANSWER_PHONE_CALLS)",
                             subtitle = "Accepts ringing calls after ring delay",
                             isGranted = readiness.hasAnswerCalls
@@ -231,7 +231,7 @@ fun SetupScreen(
                         }
                         PipelineStep("1", "Incoming call rings for your configured delay while CallDeck posts an alert.")
                         PipelineStep("2", "AnsweringInCallService answers with audio-only profile and plays your greeting.")
-                        PipelineStep("3", "After the tone, VoicemailRecorder saves the caller message as an .m4a file in local storage.")
+                        PipelineStep("3", "After the tone, VoicemailRecorder saves the caller message as an .mp3 file in local storage.")
                     }
                 }
             }
