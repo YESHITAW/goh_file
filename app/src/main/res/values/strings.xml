@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">CallDeck</string>
+    <string name="dialer_activity_label">CallDeck</string>
+    <string name="notification_channel_calls_name">Incoming Calls &amp; Answering</string>
+    <string name="notification_channel_calls_desc">Displays incoming call alerts and active answering machine status.</string>
+    <string name="nav_deck">Deck</string>
+    <string name="nav_greeting">Greeting</string>
+    <string name="nav_setup">Setup</string>
+    <string name="status_armed">ARMED</string>
+    <string name="status_standby">STANDBY</string>
+    <string name="unknown_caller">Unknown Caller</string>
+</resources>

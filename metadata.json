@@ -1,0 +1,6 @@
+{
+  "name": "CallDeck",
+  "description": "Automated phone answering machine with InCallService auto-answer, custom greetings, and local voicemail recording playback.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
