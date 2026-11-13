@@ -29,3 +29,8 @@ jobs:
       run: chmod +x gradlew
     - name: Build and test with Gradle
       run: ./gradlew assembleDebug testDebugUnitTest
+    - name: Upload Debug APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: CallDeck-debug-apk
+        path: app/build/outputs/apk/debug/app-debug.apk
